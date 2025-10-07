@@ -222,6 +222,27 @@
             currentUser: null
         };
 
+        // --- GESTÃO DE ERROS ---
+        function displayGlobalError(message) {
+            const contentArea = document.getElementById('content-area');
+            contentArea.innerHTML = `
+                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-6 rounded-lg shadow-md" role="alert">
+                    <p class="font-bold text-lg mb-2">Erro Crítico de Acesso</p>
+                    <p>${message}</p>
+                </div>
+            `;
+        }
+
+        const handleSnapshotError = (error) => {
+            console.error("Firebase Snapshot Error:", error);
+            if (error.code === 'permission-denied') {
+                displayGlobalError('Permissão negada para aceder à base de dados. Por favor, verifique as <b>Regras de Segurança</b> do seu projeto Firebase Firestore. A aplicação não pode carregar os dados.');
+            } else {
+                displayGlobalError(`Ocorreu um erro inesperado ao carregar os dados: ${error.message}`);
+            }
+        };
+
+
         // --- AUTENTICAÇÃO E CONTROLE DE ACESSO ---
         onAuthStateChanged(auth, async (user) => {
             const authContainer = document.getElementById('auth-container');
@@ -229,19 +250,26 @@
             const appContainer = document.getElementById('app-container');
 
             if (user) {
-                const userDocRef = doc(db, `users`, user.uid);
-                const userDocSnap = await getDoc(userDocRef);
-                if(userDocSnap.exists()){
-                    state.currentUser = { uid: user.uid, email: user.email, ...userDocSnap.data() };
-                    document.getElementById('user-email').textContent = state.currentUser.email;
-                    document.getElementById('user-role').textContent = state.currentUser.role;
+                try {
+                    const userDocRef = doc(db, `users`, user.uid);
+                    const userDocSnap = await getDoc(userDocRef);
+                    if (userDocSnap.exists()) {
+                        state.currentUser = { uid: user.uid, email: user.email, ...userDocSnap.data() };
+                        document.getElementById('user-email').textContent = state.currentUser.email;
+                        document.getElementById('user-role').textContent = state.currentUser.role;
 
-                    authContainer.style.display = 'none';
-                    registerContainer.style.display = 'none';
-                    appContainer.style.display = 'flex';
-                    initializeAppState();
-                } else { // Caso o documento do usuário ainda não exista
-                    await signOut(auth);
+                        authContainer.style.display = 'none';
+                        registerContainer.style.display = 'none';
+                        appContainer.style.display = 'flex';
+                        initializeAppState();
+                    } else { // Caso o documento do usuário ainda não exista (ex: foi apagado)
+                        console.warn("Documento do utilizador não encontrado, a fazer logout.");
+                        await signOut(auth);
+                    }
+                } catch (error) {
+                    console.error("Erro a obter dados do utilizador:", error);
+                    document.getElementById('login-error').textContent = 'Erro ao carregar dados. Verifique as permissões da base de dados.';
+                    await signOut(auth); // Faz logout se não conseguir obter os dados
                 }
             } else {
                 state.currentUser = null;
@@ -342,8 +370,7 @@
         }
 
         async function initializeAppState() {
-            // Código de inicialização do estado da aplicação...
-            if (!state.currentUser) return; // Garante que só inicializa se logado
+            if (!state.currentUser) return;
              gerenciaIds.forEach(id => {
                 const docRef = doc(db, `artifacts/${appId}/public/data/gerencias`, id);
                 onSnapshot(docRef, (docSnap) => {
@@ -358,7 +385,7 @@
                         state.data[id] = baseData;
                     }
                     if (state.selectedGerencia === id) render();
-                });
+                }, handleSnapshotError);
             });
             const multimidiaDocRef = doc(db, `artifacts/${appId}/public/data/gerencias`, 'multimidia');
             onSnapshot(multimidiaDocRef, (docSnap) => {
@@ -369,7 +396,7 @@
                     state.data.multimidia = baseData;
                 }
                 if (state.selectedGerencia === 'multimidia') render();
-            });
+            }, handleSnapshotError);
             initializeDocuments();
             renderSidebar();
             if(!state.selectedGerencia) setState({selectedGerencia: 'inclusao'});
@@ -400,14 +427,14 @@
                     state.data.documentos = baseData;
                 }
                 if (state.selectedGerencia === 'documentos') render();
-            });
+            }, handleSnapshotError);
         }
 
         function render() {
             if (!state.selectedGerencia || !state.currentUser) {
                 document.getElementById('content-area').innerHTML = `<div class="text-center p-10 bg-white rounded-lg shadow-md">
                     <i class="fas fa-spinner fa-spin text-5xl text-blue-500 mb-4"></i>
-                    <h2 class="text-3xl font-semibold text-gray-700">Carregando...</h2>
+                    <h2 class="text-3xl font-semibold text-gray-700">A carregar...</h2>
                 </div>`;
                 return;
             }
@@ -417,7 +444,6 @@
         }
         
         function renderSidebar() {
-            // ... (código de renderSidebar inalterado)
              const nav = document.getElementById('nav-gerencias');
             let navItems = '';
             const allGerencias = {...GERENCIAS_INFO};
@@ -428,8 +454,10 @@
                 return a.localeCompare(b);
             });
 
-            sortedKeys.forEach(id => {
-                if (id === 'documentos') return; 
+            // Filtra 'multimidia' e 'documentos' da navegação principal
+            const navKeys = sortedKeys.filter(id => id !== 'multimidia' && id !== 'documentos');
+
+            navKeys.forEach(id => {
                 const gerencia = allGerencias[id];
                 navItems += `
                     <a href="#" data-gerencia="${id}" class="gerencia-link flex items-center space-x-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md px-3 py-2 transition-colors duration-200">
@@ -441,7 +469,6 @@
         }
 
         function updateSidebarActiveState() {
-            // ... (código de updateSidebarActiveState inalterado)
             document.querySelectorAll('.gerencia-link').forEach(link => {
                 if (link.dataset.gerencia === state.selectedGerencia) {
                     link.classList.add('bg-gray-900', 'text-white');
@@ -454,7 +481,6 @@
         }
 
         function renderHeader() {
-            // ... (código de renderHeader inalterado)
              const title = document.getElementById('header-title');
             if (state.selectedGerencia) {
                 title.innerHTML = `<i class="fas ${GERENCIAS_INFO[state.selectedGerencia].icon} text-blue-500"></i> ${GERENCIAS_INFO[state.selectedGerencia].nome}`;
