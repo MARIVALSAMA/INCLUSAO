@@ -186,7 +186,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- CONFIGURAÇÃO E INICIALIZAÇÃO ---
         const firebaseConfig = {
@@ -198,7 +198,7 @@
           appId: "1:659733821935:web:20029eca7032d841b95e1a",
           measurementId: "G-RW483FFWF1"
         };
-        const appId = "diretoria-inclusao-app"; // Pode ser um ID único para a aplicação
+        const appId = "diretoria-inclusao-app";
         
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -253,6 +253,7 @@
                 try {
                     const userDocRef = doc(db, `users`, user.uid);
                     const userDocSnap = await getDoc(userDocRef);
+                    
                     if (userDocSnap.exists()) {
                         state.currentUser = { uid: user.uid, email: user.email, ...userDocSnap.data() };
                         document.getElementById('user-email').textContent = state.currentUser.email;
@@ -262,14 +263,19 @@
                         registerContainer.style.display = 'none';
                         appContainer.style.display = 'flex';
                         initializeAppState();
-                    } else { // Caso o documento do usuário ainda não exista (ex: foi apagado)
-                        console.warn("Documento do utilizador não encontrado, a fazer logout.");
+                    } else {
+                        console.error("Erro Crítico: Utilizador autenticado mas sem perfil na base de dados. A fazer logout forçado.");
+                        document.getElementById('login-error').textContent = 'Erro de perfil. Por favor, tente registar-se novamente ou contacte o suporte.';
                         await signOut(auth);
                     }
                 } catch (error) {
                     console.error("Erro a obter dados do utilizador:", error);
-                    document.getElementById('login-error').textContent = 'Erro ao carregar dados. Verifique as permissões da base de dados.';
-                    await signOut(auth); // Faz logout se não conseguir obter os dados
+                     if (error.code === 'permission-denied') {
+                        document.getElementById('login-error').textContent = 'Erro de permissão. Verifique as regras do Firestore.';
+                    } else {
+                        document.getElementById('login-error').textContent = 'Erro ao carregar dados do utilizador.';
+                    }
+                    await signOut(auth);
                 }
             } else {
                 state.currentUser = null;
@@ -303,10 +309,9 @@
             try {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
-                // Cria um documento para o usuário com permissão padrão
                 await setDoc(doc(db, `users`, user.uid), {
                     email: user.email,
-                    role: 'viewer' // Permissão padrão: apenas visualização
+                    role: 'viewer' 
                 });
             } catch (error) {
                 errorP.textContent = 'Erro ao criar conta. Verifique o e-mail e a senha (mínimo 6 caracteres).';
@@ -379,7 +384,7 @@
                     } else {
                         const baseData = {
                             id: id, nome: GERENCIAS_INFO[id].nome, escolas: [], projetosAtivos: [], profissionaisLibra: 0, formacoes: [],
-                            ...(id === 'inclusao' && { alunosLaudados: 0, alunosNaoLaudados: 0, alunosEmInvestigacao: 0 })
+                            ...(id === 'inclusao' && { alunos: [], profissionaisApoio: [] }) // Adicionado profissionaisApoio
                         };
                         if(canEdit()) setDoc(docRef, baseData).catch(e => console.error("Erro ao criar documento:", e));
                         state.data[id] = baseData;
@@ -490,11 +495,11 @@
         }
         
         function renderContent() {
-             const contentArea = document.getElementById('content-area');
+            const contentArea = document.getElementById('content-area');
             const data = state.data[state.selectedGerencia] || {};
             
             const abasComuns = [ { id: 'escolas', nome: 'Unidades Escolares' }, { id: 'projetos', nome: 'Projetos Ativos' }, { id: 'libra', nome: 'Profissionais de LIBRAS' }, { id: 'formacao', nome: 'Formações' }, ];
-            const abasInclusao = [ { id: 'alunos', nome: 'Quantitativo de Alunos' }, ...abasComuns ];
+            const abasInclusao = [ { id: 'alunos', nome: 'Alunos' }, { id: 'pa', nome: 'Profissionais de Apoio (PA)' }, ...abasComuns ];
             
             let abas = (state.selectedGerencia === 'inclusao') ? abasInclusao : abasComuns;
             if (state.selectedGerencia === 'multimidia' || state.selectedGerencia === 'documentos') abas = [];
@@ -511,6 +516,7 @@
             let contentHtml = '';
             switch(state.selectedAba) {
                 case 'alunos': contentHtml = renderAlunos(data); break;
+                case 'pa': contentHtml = renderProfissionaisApoio(data); break;
                 case 'escolas': contentHtml = renderEscolas(data); break;
                 case 'projetos': contentHtml = renderProjetos(data); break;
                 case 'libra': contentHtml = renderLibra(data); break;
@@ -528,6 +534,7 @@
             `;
             contentArea.innerHTML = finalHtml;
         }
+
         function createCard(title, value, icon) {
              return `<div class="bg-white p-6 rounded-lg shadow-lg border border-gray-200 flex items-center space-x-4">
                 <div class="bg-blue-100 text-blue-500 rounded-full p-3">
@@ -540,11 +547,77 @@
             </div>`;
         }
 
-        // --- RENDERIZAÇÃO DAS ABAS ESPECÍFICAS (com controle de permissão) ---
+        // --- RENDERIZAÇÃO DAS ABAS ESPECÍFICAS ---
         
         function renderAlunos(data) {
-             const cards = `<div class="grid grid-cols-1 md:grid-cols-3 gap-6"> ${createCard('Alunos Laudados', data.alunosLaudados || 0, 'fa-user-check')} ${createCard('Alunos Não Laudados', data.alunosNaoLaudados || 0, 'fa-user-clock')} ${createCard('Alunos em Investigação', data.alunosEmInvestigacao || 0, 'fa-user-magnifying-glass')} </div>`;
-             return `<div class="flex justify-between items-center mb-6"> <h2 class="text-2xl font-bold text-gray-700">Situação dos Alunos</h2> ${createActionButton('btn-edit-alunos', 'Editar Quantitativos', 'fa-edit', 'bg-blue-500')} </div> ${cards}`;
+            const alunos = data.alunos || [];
+            const laudados = alunos.filter(a => a.situacao === 'Laudado').length;
+            const naoLaudados = alunos.filter(a => a.situacao === 'Não Laudado').length;
+            const emInvestigacao = alunos.filter(a => a.situacao === 'Em Investigação').length;
+
+            const cards = `<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    ${createCard('Alunos Laudados', laudados, 'fa-user-check')}
+                    ${createCard('Alunos Não Laudados', naoLaudados, 'fa-user-clock')}
+                    ${createCard('Alunos em Investigação', emInvestigacao, 'fa-user-magnifying-glass')}
+                </div>`;
+            const table = createDataTable('Alunos', 
+                ['Nome', 'Escola', 'Situação', 'Deficiência'], 
+                alunos, 
+                (aluno) => [aluno.nome, aluno.escola, aluno.situacao, aluno.deficiencia || 'N/A'],
+                'btn-add-aluno', 'btn-edit-aluno', 'alunos');
+            return `
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-700">Gestão de Alunos</h2>
+                    ${createActionButton('btn-add-aluno', 'Adicionar Aluno', 'fa-plus', 'bg-green-500')}
+                </div>
+                ${cards}
+                ${table}`;
+        }
+
+        function renderProfissionaisApoio(data) {
+            const profissionais = data.profissionaisApoio || [];
+            const card = createCard('Total de Profissionais de Apoio', profissionais.length, 'fa-user-shield');
+            const table = createDataTable('Profissionais de Apoio',
+                ['Nome', 'CPF', 'Telefone', 'Escola de Atuação'],
+                profissionais,
+                (pa) => [pa.nome, pa.cpf, pa.telefone, pa.escola],
+                'btn-add-pa', 'btn-edit-pa', 'profissionaisApoio');
+
+            return `
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-700">Gestão de Profissionais de Apoio (PA)</h2>
+                    ${createActionButton('btn-add-pa', 'Adicionar Profissional', 'fa-plus', 'bg-green-500')}
+                </div>
+                <div class="mb-8 flex justify-center">${card}</div>
+                ${table}`;
+        }
+
+        function createDataTable(title, headers, items, rowRenderer, addBtnId, editBtnClass, itemType) {
+            const tableHeader = `
+                <thead class="bg-gray-50">
+                    <tr>
+                        ${headers.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('')}
+                        ${canEdit() ? '<th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>' : ''}
+                    </tr>
+                </thead>`;
+
+            const tableBody = items.length > 0 ? items.map(item => `
+                <tr class="bg-white border-b hover:bg-gray-50">
+                    ${rowRenderer(item).map(cell => `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${cell}</td>`).join('')}
+                    ${canEdit() ? `
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button class="${editBtnClass} text-indigo-600 hover:text-indigo-900" data-item='${JSON.stringify(item)}'><i class="fas fa-edit"></i></button>
+                            <button class="btn-delete-item text-red-600 hover:text-red-900 ml-4" data-type="${itemType}" data-item='${JSON.stringify(item)}'><i class="fas fa-trash"></i></button>
+                        </td>` : ''}
+                </tr>`).join('') : `<tr><td colspan="${headers.length + (canEdit() ? 1 : 0)}" class="text-center py-10 text-gray-500">Nenhum item cadastrado.</td></tr>`;
+
+            return `
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        ${tableHeader}
+                        <tbody class="bg-white divide-y divide-gray-200">${tableBody}</tbody>
+                    </table>
+                </div>`;
         }
         
         function renderEscolas(data) {
@@ -556,9 +629,7 @@
                 </div>`).join('') : '<p class="text-gray-500 text-center col-span-full">Nenhuma unidade escolar cadastrada.</p>';
 
             return `<div class="flex justify-between items-center mb-6">
-                        <div>
-                            <h2 class="text-2xl font-bold text-gray-700">Unidades Escolares (${total})</h2>
-                        </div>
+                        <div><h2 class="text-2xl font-bold text-gray-700">Unidades Escolares (${total})</h2></div>
                         <div class="flex space-x-2">
                            <button id="btn-export-escolas-pdf" class="bg-gray-700 hover:opacity-80 text-white font-bold py-2 px-4 rounded-lg shadow-md"><i class="fas fa-file-pdf"></i> PDF</button>
                            <button id="btn-export-escolas-excel" class="bg-gray-700 hover:opacity-80 text-white font-bold py-2 px-4 rounded-lg shadow-md"><i class="fas fa-file-excel"></i> Excel</button>
@@ -665,6 +736,15 @@
          function createTextarea(id, label, value = '', placeholder = '') {
             return ` <div class="mb-4"> <label for="${id}" class="block text-gray-700 text-sm font-bold mb-2">${label}</label> <textarea id="${id}" placeholder="${placeholder}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:ring-2 focus:ring-blue-500 h-24">${value}</textarea> </div>`;
         }
+        function createSelect(id, label, options, selectedValue = '') {
+            const optionsHtml = options.map(opt => `<option value="${opt}" ${opt === selectedValue ? 'selected' : ''}>${opt}</option>`).join('');
+            return `<div class="mb-4">
+                        <label for="${id}" class="block text-gray-700 text-sm font-bold mb-2">${label}</label>
+                        <select id="${id}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:ring-2 focus:ring-blue-500">
+                            ${optionsHtml}
+                        </select>
+                    </div>`;
+        }
 
         function createSubmitButton(text) {
              return `<button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition-transform transform hover:scale-105">${text}</button>`;
@@ -673,14 +753,12 @@
         // --- MANIPULADORES DE EVENTOS ---
 
         document.addEventListener('click', async (e) => {
-            // Navegação
             const gerenciaLink = e.target.closest('.gerencia-link');
             if (gerenciaLink) { e.preventDefault(); setState({ selectedGerencia: gerenciaLink.dataset.gerencia, selectedAba: null }); if(window.innerWidth < 768) { document.getElementById('sidebar').classList.add('sidebar-closed'); document.getElementById('sidebar').classList.remove('sidebar-open'); } }
             
             const abaLink = e.target.closest('.aba-link');
             if (abaLink) { e.preventDefault(); setState({ selectedAba: abaLink.dataset.aba }); }
 
-            // Exclusão
             const deleteBtn = e.target.closest('.btn-delete-item');
             if (deleteBtn && canEdit()) {
                 const type = deleteBtn.dataset.type;
@@ -693,41 +771,83 @@
                 }
             }
             
-            // Botões de Ação
             const actionButton = e.target.closest('button');
             if (!actionButton) return;
-            const gerenciaData = state.data[state.selectedGerencia] || {};
+            
+            const itemDataStr = actionButton.dataset.item;
+            if(itemDataStr) {
+                const item = JSON.parse(itemDataStr);
+                if (actionButton.matches('.btn-edit-aluno')) {
+                    openModal('Editar Aluno', `
+                        <form id="form-edit-aluno" data-item-id="${item.id}">
+                            ${createInput('alunoNome', 'Nome do Aluno', 'text', item.nome)}
+                            ${createInput('alunoEscola', 'Escola', 'text', item.escola)}
+                            ${createSelect('alunoSituacao', 'Situação', ['Laudado', 'Não Laudado', 'Em Investigação'], item.situacao)}
+                            <div id="deficiencia-container" class="${item.situacao === 'Laudado' ? '' : 'hidden'}">
+                                ${createInput('alunoDeficiencia', 'Tipo de Deficiência', 'text', item.deficiencia || '')}
+                            </div>
+                            ${createSubmitButton('Salvar Alterações')}
+                        </form>
+                    `);
+                    return;
+                }
+                if (actionButton.matches('.btn-edit-pa')) {
+                     openModal('Editar Profissional de Apoio', `
+                        <form id="form-edit-pa" data-item-id="${item.id}">
+                            ${createInput('paNome', 'Nome Completo', 'text', item.nome)}
+                            ${createInput('paCpf', 'CPF', 'text', item.cpf)}
+                            ${createInput('paTelefone', 'Telefone', 'text', item.telefone)}
+                            ${createInput('paEscola', 'Escola de Atuação', 'text', item.escola)}
+                            ${createSubmitButton('Salvar Alterações')}
+                        </form>
+                    `);
+                    return;
+                }
+            }
+
 
             switch (actionButton.id) {
-                // Exportação
+                case 'btn-add-aluno':
+                    openModal('Adicionar Aluno', `
+                        <form id="form-add-aluno">
+                            ${createInput('alunoNome', 'Nome do Aluno', 'text', '', 'Nome completo do aluno')}
+                            ${createInput('alunoEscola', 'Escola', 'text', '', 'Escola onde está matriculado')}
+                            ${createSelect('alunoSituacao', 'Situação', ['Laudado', 'Não Laudado', 'Em Investigação'])}
+                            <div id="deficiencia-container" class="hidden">
+                                ${createInput('alunoDeficiencia', 'Tipo de Deficiência', 'text', '', 'Ex: Autismo, TDAH, etc.')}
+                            </div>
+                            ${createSubmitButton('Adicionar Aluno')}
+                        </form>
+                    `);
+                    break;
+                case 'btn-add-pa':
+                    openModal('Adicionar Profissional de Apoio', `
+                        <form id="form-add-pa">
+                            ${createInput('paNome', 'Nome Completo', 'text', '', 'Nome do profissional')}
+                            ${createInput('paCpf', 'CPF', 'text', '', '000.000.000-00')}
+                            ${createInput('paTelefone', 'Telefone', 'text', '', '(00) 00000-0000')}
+                            ${createInput('paEscola', 'Escola de Atuação', 'text', '', 'Nome da escola')}
+                            ${createSubmitButton('Adicionar Profissional')}
+                        </form>
+                    `);
+                    break;
                  case 'btn-export-escolas-pdf':
-                    exportToPdf(
-                        ['Nome', 'Detalhes'], 
-                        state.data[state.selectedGerencia]?.escolas.map(e => [e.nome, e.detalhes]) || [],
-                        'Unidades_Escolares'
-                    );
+                    exportToPdf(['Nome', 'Detalhes'], state.data[state.selectedGerencia]?.escolas.map(e => [e.nome, e.detalhes]) || [], 'Unidades_Escolares');
                     break;
                 case 'btn-export-escolas-excel':
                     exportToExcel(state.data[state.selectedGerencia]?.escolas || [], 'Unidades_Escolares');
                     break;
                 case 'btn-export-projetos-pdf':
-                     exportToPdf(
-                        ['Nome', 'Descrição'], 
-                        state.data[state.selectedGerencia]?.projetosAtivos.map(p => [p.nome, p.descricao]) || [],
-                        'Projetos_Ativos'
-                    );
+                     exportToPdf(['Nome', 'Descrição'], state.data[state.selectedGerencia]?.projetosAtivos.map(p => [p.nome, p.descricao]) || [], 'Projetos_Ativos');
                     break;
                 case 'btn-export-projetos-excel':
                     exportToExcel(state.data[state.selectedGerencia]?.projetosAtivos || [], 'Projetos_Ativos');
                     break;
-                
-                // Outras Ações
                 case 'menu-button': document.getElementById('sidebar').classList.toggle('sidebar-closed'); document.getElementById('sidebar').classList.toggle('sidebar-open'); break;
                 case 'modal-close': closeModal(); break;
-                case 'btn-edit-alunos': openModal('Editar Quantitativos de Alunos', `<form id="form-edit-alunos"> ${createInput('alunosLaudados', 'Alunos Laudados', 'number', gerenciaData.alunosLaudados || 0)} ${createInput('alunosNaoLaudados', 'Alunos Não Laudados', 'number', gerenciaData.alunosNaoLaudados || 0)} ${createInput('alunosEmInvestigacao', 'Alunos em Investigação', 'number', gerenciaData.alunosEmInvestigacao || 0)} ${createSubmitButton('Salvar Alterações')} </form>`); break;
                 case 'btn-add-escola': openModal('Adicionar Unidade Escolar', `<form id="form-add-escola"> ${createInput('escolaNome', 'Nome da Escola', 'text', '', 'Ex: E.M. Prof. João da Silva')} ${createTextarea('escolaDetalhes', 'Detalhes (Endereço, etc)', '', 'Ex: Rua Principal, 123, Centro')} ${createSubmitButton('Adicionar Escola')} </form>`); break;
                 case 'btn-add-projeto': openModal('Adicionar Projeto Ativo', `<form id="form-add-projeto"> ${createInput('projetoNome', 'Nome do Projeto', 'text', '', 'Ex: Inclusão Digital na Escola')} ${createTextarea('projetoDescricao', 'Descrição do Projeto')} ${createSubmitButton('Adicionar Projeto')} </form>`); break;
-                case 'btn-edit-libra': openModal('Editar Quantitativo de Prof. de LIBRAS', `<form id="form-edit-libra"> ${createInput('profissionaisLibra', 'Total de Profissionais', 'number', gerenciaData.profissionaisLibra || 0)} ${createSubmitButton('Salvar Alterações')} </form>`); break;
+                case 'btn-edit-libra': openModal('Editar Quantitativo de Prof. de LIBRAS', `<form id="form-edit-libra"> ${createInput('profissionaisLibra', 'Total de Profissionais', 'number', (state.data[state.selectedGerencia] || {}).profissionaisLibra || 0)} ${createSubmitButton('Salvar Alterações')} </form>`); break;
                 case 'btn-add-formacao': openModal('Adicionar Formação', `<form id="form-add-formacao"> ${createInput('formacaoNome', 'Nome da Formação', 'text', '', 'Ex: Capacitação em Autismo')} ${createInput('formacaoData', 'Data da Formação', 'date')} ${createTextarea('formacaoDescricao', 'Descrição da Formação')} ${createSubmitButton('Adicionar Formação')} </form>`); break;
                 case 'btn-add-midia': let options = gerenciaIds.map(id => `<option value="${id}">${GERENCIAS_INFO[id].nome}</option>`).join(''); openModal('Adicionar Mídia', `<form id="form-add-midia"> ${createInput('midiaTitulo', 'Título da Mídia', 'text', '', 'Ex: Vídeo da Formação de Inclusão')} ${createInput('midiaUrl', 'URL do Recurso', 'url', '', 'https://www.youtube.com/watch?v=...')} <div class="mb-4"> <label for="midiaGerencia" class="block text-gray-700 text-sm font-bold mb-2">Gerência Associada</label> <select id="midiaGerencia" class="shadow border rounded w-full py-2 px-3 text-gray-700">${options}</select> </div> ${createSubmitButton('Adicionar Mídia')} </form>`); break;
                 case 'btn-add-documento':
@@ -750,12 +870,33 @@
         // --- MANIPULADORES DE SUBMISSÃO DE FORMULÁRIO ---
         document.addEventListener('submit', async (e) => {
             e.preventDefault();
-            if(!canEdit()) return; // Impede submissão se não tiver permissão
+            if(!canEdit()) return;
             const form = e.target;
             const docRef = doc(db, `artifacts/${appId}/public/data/gerencias`, state.selectedGerencia);
             
             switch (form.id) {
-                case 'form-edit-alunos': await updateDoc(docRef, { alunosLaudados: parseInt(form.alunosLaudados.value, 10), alunosNaoLaudados: parseInt(form.alunosNaoLaudados.value, 10), alunosEmInvestigacao: parseInt(form.alunosEmInvestigacao.value, 10), }); break;
+                case 'form-add-aluno': {
+                    const newAluno = { id: crypto.randomUUID(), nome: form.alunoNome.value, escola: form.alunoEscola.value, situacao: form.alunoSituacao.value, deficiencia: form.alunoSituacao.value === 'Laudado' ? form.alunoDeficiencia.value : '', };
+                    await updateDoc(docRef, { alunos: arrayUnion(newAluno) });
+                    break;
+                }
+                case 'form-edit-aluno': {
+                    const itemId = form.dataset.itemId;
+                    const updatedItems = (state.data.inclusao.alunos || []).map(item => (item.id === itemId) ? { ...item, nome: form.alunoNome.value, escola: form.alunoEscola.value, situacao: form.alunoSituacao.value, deficiencia: form.alunoSituacao.value === 'Laudado' ? form.alunoDeficiencia.value : '' } : item);
+                    await updateDoc(docRef, { alunos: updatedItems });
+                    break;
+                }
+                 case 'form-add-pa': {
+                    const newItem = { id: crypto.randomUUID(), nome: form.paNome.value, cpf: form.paCpf.value, telefone: form.paTelefone.value, escola: form.paEscola.value };
+                    await updateDoc(docRef, { profissionaisApoio: arrayUnion(newItem) });
+                    break;
+                }
+                case 'form-edit-pa': {
+                    const itemId = form.dataset.itemId;
+                    const updatedItems = (state.data.inclusao.profissionaisApoio || []).map(item => (item.id === itemId) ? { ...item, nome: form.paNome.value, cpf: form.paCpf.value, telefone: form.paTelefone.value, escola: form.paEscola.value } : item);
+                    await updateDoc(docRef, { profissionaisApoio: updatedItems });
+                    break;
+                }
                 case 'form-add-escola': await updateDoc(docRef, { escolas: arrayUnion({ id: crypto.randomUUID(), nome: form.escolaNome.value, detalhes: form.escolaDetalhes.value }) }); break;
                 case 'form-add-projeto': await updateDoc(docRef, { projetosAtivos: arrayUnion({ id: crypto.randomUUID(), nome: form.projetoNome.value, descricao: form.projetoDescricao.value }) }); break;
                 case 'form-edit-libra': await updateDoc(docRef, { profissionaisLibra: parseInt(form.profissionaisLibra.value, 10) }); break;
@@ -771,12 +912,23 @@
                         await updateDoc(docRefDocs, { documentos: arrayUnion(newItem) });
                     } else {
                         alert("Por favor, selecione um arquivo.");
-                        return; // Não fecha o modal se nenhum arquivo for selecionado
+                        return;
                     }
                     break;
                 }
             }
             closeModal();
+        });
+
+        document.addEventListener('change', (e) => {
+            if (e.target.id === 'alunoSituacao') {
+                const deficienciaContainer = document.getElementById('deficiencia-container');
+                if (e.target.value === 'Laudado') {
+                    deficienciaContainer.classList.remove('hidden');
+                } else {
+                    deficienciaContainer.classList.add('hidden');
+                }
+            }
         });
     </script>
 </body>
