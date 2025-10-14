@@ -295,7 +295,11 @@
             try {
                 await signInWithEmailAndPassword(auth, email, password);
             } catch (error) {
-                errorP.textContent = 'E-mail ou senha inválidos.';
+                 if (error.code === 'auth/invalid-credential') {
+                    errorP.textContent = 'Credenciais inválidas. Verifique o e-mail e a senha.';
+                } else {
+                    errorP.textContent = 'Ocorreu um erro ao tentar entrar.';
+                }
                 console.error("Login failed:", error);
             }
         });
@@ -384,7 +388,7 @@
                     } else {
                         const baseData = {
                             id: id, nome: GERENCIAS_INFO[id].nome, escolas: [], projetosAtivos: [], profissionaisLibra: 0, formacoes: [],
-                            ...(id === 'inclusao' && { alunos: [], profissionaisApoio: [] }) // Adicionado profissionaisApoio
+                            ...(id === 'inclusao' && { alunos: [], profissionaisApoio: [] })
                         };
                         if(canEdit()) setDoc(docRef, baseData).catch(e => console.error("Erro ao criar documento:", e));
                         state.data[id] = baseData;
@@ -415,18 +419,7 @@
                  else {
                      const baseData = {
                         id: 'documentos',
-                        documentos: [
-                            { id: 'lbi', nome: 'LEI BRASILEIRA DE INCLUSÃO.docx', categoria: 'Legislação', tipo: 'docx' },
-                            { id: 'ldb', nome: 'LEI DIRETRIZES E BASES DA EDUCAÇÃO.docx', categoria: 'Legislação', tipo: 'docx' },
-                            { id: 'bilingue', nome: 'LEI DE EDUCAÇÃO BILINGUE.pdf', categoria: 'Legislação', tipo: 'pdf' },
-                            { id: 'lei18182', nome: 'Lei_18.182.pdf', categoria: 'Legislação', tipo: 'pdf' },
-                            { id: 'cartilha', nome: 'CartilhaSMESP.pdf', categoria: 'Material de Apoio', tipo: 'pdf' },
-                            { id: 'plano2025', nome: 'PLANO AÇÃO 2025 (1).doc', categoria: 'Planos e Projetos', tipo: 'doc' },
-                            { id: 'projReflito', nome: 'Projeto Reflito.docx', categoria: 'Planos e Projetos', tipo: 'docx' },
-                            { id: 'projEscritas', nome: 'PROJETO ESCRITAS QUE TRASNFORMAM IMPRESSÃO.docx', categoria: 'Planos e Projetos', tipo: 'docx' },
-                            { id: 'listApoio', nome: 'Listagem de Profissionais de Apoio Efetivo.docx', categoria: 'Listagens', tipo: 'docx' },
-                            { id: 'listLibras', nome: 'LISTAGEM DOS INTERPRETES DE LIBRAS EFETIVOS DA REDE.docx', categoria: 'Listagens', tipo: 'docx' }
-                        ]
+                        documentos: []
                     };
                     if(canEdit()) setDoc(docRef, baseData).catch(e => console.error("Erro ao criar doc documentos:", e));
                     state.data.documentos = baseData;
@@ -901,7 +894,7 @@
                 case 'form-add-projeto': await updateDoc(docRef, { projetosAtivos: arrayUnion({ id: crypto.randomUUID(), nome: form.projetoNome.value, descricao: form.projetoDescricao.value }) }); break;
                 case 'form-edit-libra': await updateDoc(docRef, { profissionaisLibra: parseInt(form.profissionaisLibra.value, 10) }); break;
                 case 'form-add-formacao': await updateDoc(docRef, { formacoes: arrayUnion({ id: crypto.randomUUID(), nome: form.formacaoNome.value, data: form.formacaoData.value, descricao: form.formacaoDescricao.value }) }); break;
-                case 'form-add-midia': const midiaDocRef = doc(db, `artifacts/${appId}/public/data/gerencias`, 'multimidia'); await updateDoc(midiaDocRef, { midias: arrayUnion({ id: crypto.randomUUID(), titulo: form.midiaTitulo.value, url: form.midiaUrl.value, gerencia: form.midiaGerencia.value }) }); break;
+                case 'form-add-midia': const midiaDocRef = doc(db, `artifacts/${appId}/public/data/gerencias`, 'multimidia'); await updateDoc(midiaDocRef, { midias: arrayUnion({ id: crypto.randomUUID(), titulo: form.midiaTitulo.value, url: form.midiaUrl.value, gerencia: form.mediaGerencia.value }) }); break;
                 case 'form-add-documento': {
                     const fileInput = form.querySelector('#docNomeFake');
                     if (fileInput.files.length > 0) {
