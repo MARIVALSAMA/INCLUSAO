@@ -387,44 +387,29 @@
                 onSnapshot(docRef, (docSnap) => {
                     if (docSnap.exists()) {
                         state.data[id] = docSnap.data();
-                    } else {
-                        const baseData = {
-                            id: id, nome: GERENCIAS_INFO[id].nome, escolas: [], projetosAtivos: [], profissionaisLibra: [], formacoes: [],
-                            ...(id === 'inclusao' && { alunos: [], profissionaisApoio: [] })
-                        };
-                        if(canEdit()) setDoc(docRef, baseData).catch(e => console.error("Erro ao criar documento:", e));
-                        state.data[id] = baseData;
                     }
                     if (state.selectedGerencia === id) render();
                 }, handleSnapshotError);
             });
             const multimidiaDocRef = doc(db, `artifacts/${appId}/public/data/gerencias`, 'multimidia');
             onSnapshot(multimidiaDocRef, (docSnap) => {
-                if (docSnap.exists()) { state.data.multimidia = docSnap.data(); } 
-                else { 
-                    const baseData = { id: 'multimidia', midias: [] };
-                    if(canEdit()) setDoc(multimidiaDocRef, baseData).catch(e => console.error("Erro ao criar doc multimidia:", e));
-                    state.data.multimidia = baseData;
+                if (docSnap.exists()) { 
+                    state.data.multimidia = docSnap.data();
                 }
                 if (state.selectedGerencia === 'multimidia') render();
             }, handleSnapshotError);
-            initializeDocuments();
-            renderSidebar();
-            if(!state.selectedGerencia) setState({selectedGerencia: 'inclusao'});
-            else render();
-        }
-
-        function initializeDocuments() {
+            
             const docRef = doc(db, `artifacts/${appId}/public/data/gerencias`, 'documentos');
             onSnapshot(docRef, (docSnap) => {
-                if (docSnap.exists()) { state.data.documentos = docSnap.data(); }
-                 else {
-                     const baseData = { id: 'documentos', documentos: [] };
-                    if(canEdit()) setDoc(docRef, baseData).catch(e => console.error("Erro ao criar doc documentos:", e));
-                    state.data.documentos = baseData;
+                if (docSnap.exists()) { 
+                    state.data.documentos = docSnap.data(); 
                 }
                 if (state.selectedGerencia === 'documentos') render();
             }, handleSnapshotError);
+            
+            renderSidebar();
+            if(!state.selectedGerencia) setState({selectedGerencia: 'inclusao'});
+            else render();
         }
 
         function render() {
