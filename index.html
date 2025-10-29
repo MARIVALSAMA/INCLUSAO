@@ -131,6 +131,10 @@
                     <i class="fas fa-file-alt w-6 text-center"></i>
                     <span>Documentos</span>
                 </a>
+                 <a href="#" data-gerencia="multimidia" class="gerencia-link flex items-center space-x-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md px-3 py-2 transition-colors duration-200 mt-2">
+                    <i class="fas fa-photo-video w-6 text-center"></i>
+                    <span>Multimídia</span>
+                </a>
             </div>
         </aside>
 
@@ -207,21 +211,112 @@
 
         const GERENCIAS_INFO = {
             'inclusao': { nome: 'Diretoria de Inclusão', icon: 'fa-universal-access' },
-            'quilombola': { nome: 'Quilombola', icon: 'fa-landmark' },
-            'indigena': { nome: 'Indígena', icon: 'fa-feather-alt' },
-            'campo': { nome: 'Educação do Campo', icon: 'fa-tractor' },
+            'povos_tradicionais': { nome: 'Comunidade e Povos Tradicionais', icon: 'fa-users' },
             'ameei': { nome: 'AMEEI', icon: 'fa-hands-helping' },
+            'socioeducacional': { nome: 'Socioeducacional', icon: 'fa-graduation-cap' },
+            // Mantidos para referência, mas não no menu principal
             'multimidia': { nome: 'Multimídia', icon: 'fa-photo-video' },
             'documentos': { nome: 'Documentos', icon: 'fa-file-alt' }
         };
 
-        const gerenciaIds = Object.keys(GERENCIAS_INFO).filter(g => g !== 'multimidia' && g !== 'documentos');
+        // IDs das diretorias principais a serem exibidas no menu
+        const gerenciaIds = ['inclusao', 'povos_tradicionais', 'ameei', 'socioeducacional'];
+
         let state = {
             selectedGerencia: null,
             selectedAba: null,
             data: {},
             currentUser: null
         };
+
+        // Dados iniciais
+        const initialLibrasProfessionals = [
+            { id: "libra-01", nome: "DAVI SANTOS LIRO", cargo: "LIBRAS – NÍVEL II", unidadeEscolar: "IRENE ANDRADE", alunosAtendidos: "PÂMELA E WILLIAN" },
+            { id: "libra-02", nome: "LIDIANE SACRAMENTO", cargo: "LIBRAS – NÍVEL II", unidadeEscolar: "CMA, IRENE ANDRADE, CRECHE BAIXA DA CANDEIA", alunosAtendidos: "RAÍSSA PEREIRA, WILLIAN, ERICK DA PAIXÃO" },
+            { id: "libra-03", nome: "GABRIEL MACEDO DE CARVALHO", cargo: "LIBRAS – NÍVEL I", unidadeEscolar: "JAIRO AZI ( RIACHO DA GUIA )", alunosAtendidos: "BRUNO DOS SANTOS BISPO" },
+            { id: "libra-04", nome: "INALDICE DOS SANTOS REIS", cargo: "LIBRAS – NÍVEL II", unidadeEscolar: "CMA", alunosAtendidos: "RUAN E LUDIMILA" },
+            { id: "libra-05", nome: "NAOMY RAISSA DE OLIVEIRA SILVA RABELO DE BRITO", cargo: "LIBRAS – NÍVEL I", unidadeEscolar: "PEDRO FURTADO", alunosAtendidos: "" },
+            { id: "libra-06", nome: "ERNANES CASTRO DOS SANTOS JUNIOR", cargo: "LIBRAS – NÍVEL I", unidadeEscolar: "RIO BRANCO", alunosAtendidos: "" }
+        ];
+
+        const escolasIniciais = [
+             { id: "c29e6129-923f-4e4b-87d3-356a31c5b882", nome: 'AMEEI - Núcleo de Atendimento Multidisciplinar Educacional Especializado em Inclusão', detalhes: '0 alunos matriculados' },
+             { id: "5a1a1a7a-9b1e-4f7f-8d4e-3f1d3c1a3b1a", nome: 'Centro Educacional Murilo Coelho Cavalcanti', detalhes: '76 alunos matriculados' },
+             { id: "a3b2b1a0-3c1d-4e2f-8a4b-1a2b3c4d5e6f", nome: 'Colégio Municipal de Alagoinhas', detalhes: '779 alunos matriculados' },
+             { id: "f4e5d6c7-9b8a-4d3c-8b2a-1a2b3c4d5e6f", nome: 'Colégio Municipal Doutor Jairo Azi', detalhes: '468 alunos matriculados' },
+             { id: "b1a2c3d4-e5f6-4a7b-8c9d-1a2b3c4d5e6f", nome: 'Colégio Municipal Miguel Santos Fontes', detalhes: '156 alunos matriculados' },
+             { id: "e1f2a3b4-c5d6-4e7f-8a9b-1a2b3c4d5e6f", nome: 'Creche Escola Municipal Rosário da Caridade', detalhes: '100 alunos matriculados' },
+             { id: "f1a2b3c4-d5e6-4f7a-8b9c-1a2b3c4d5e6f", nome: 'Creche Escola Municipal São José Operário', detalhes: '103 alunos matriculados' },
+             { id: "a1b2c3d4-e5f6-4a7b-8c9d-1a2b3c4d5e6f", nome: 'Creche Municipal Alagoinhas IV', detalhes: '108 alunos matriculados' },
+             { id: "b2c3d4e5-f6a7-4b8c-9d1a-1a2b3c4d5e6f", nome: 'Creche Municipal Alegria da Mamãe', detalhes: '78 alunos matriculados' },
+             { id: "c3d4e5f6-a7b8-4c9d-1a2b-1a2b3c4d5e6f", nome: 'Creche Municipal Ana Oliveira Campos', detalhes: '100 alunos matriculados' },
+             { id: "d4e5f6a7-b8c9-4d1a-2b3c-1a2b3c4d5e6f", nome: 'Creche Municipal Baixa da Candeia', detalhes: '79 alunos matriculados' },
+             { id: "e5f6a7b8-c9d1-4e2b-3c4d-1a2b3c4d5e6f", nome: 'Creche Municipal Girassol', detalhes: '80 alunos matriculados' },
+             { id: "f6a7b8c9-d1e2-4f3c-4d5e-1a2b3c4d5e6f", nome: 'Creche Municipal Imaculada Conceição', detalhes: '101 alunos matriculados' },
+             { id: "a7b8c9d1-e2f3-4a4d-5e6f-1a2b3c4d5e6f", nome: 'Creche Municipal Parque São Bernardo', detalhes: '49 alunos matriculados' },
+             { id: "b8c9d1e2-f3a4-4b5e-6f7a-1a2b3c4d5e6f", nome: 'Creche Municipal Santo Antônio', detalhes: '108 alunos matriculados' },
+             { id: "c9d1e2f3-a4b5-4c6f-7a8b-1a2b3c4d5e6f", nome: 'Creche Municipal São Benedito', detalhes: '55 alunos matriculados' },
+             { id: "d1e2f3a4-b5c6-4d7a-8b9c-1a2b3c4d5e6f", nome: 'Creche Municipal São José', detalhes: '71 alunos matriculados' },
+             { id: "e2f3a4b5-c6d7-4e8b-9c1d-1a2b3c4d5e6f", nome: 'Escola Municipal Alagoinhas IV', detalhes: '304 alunos matriculados' },
+             { id: "f3a4b5c6-d7e8-4f9c-1d2e-1a2b3c4d5e6f", nome: 'Escola Municipal Alaíde Santana Santos', detalhes: '135 alunos matriculados' },
+             { id: "a4b5c6d7-e8f9-4a1d-2e3f-1a2b3c4d5e6f", nome: 'Escola Municipal Álvaro Müller', detalhes: '351 alunos matriculados' },
+             { id: "b5c6d7e8-f9a1-4b2e-3f4a-1a2b3c4d5e6f", nome: 'Escola Municipal Amando Alves de Azevedo', detalhes: '124 alunos matriculados' },
+             { id: "c6d7e8f9-a1b2-4c3f-4a5b-1a2b3c4d5e6f", nome: 'Escola Municipal Comunitária Nova Esperança', detalhes: '186 alunos matriculados' },
+             { id: "d7e8f9a1-b2c3-4d4a-5b6c-1a2b3c4d5e6f", nome: 'Escola Municipal Dom Avelar Brandão Vilela', detalhes: '233 alunos matriculados' },
+             { id: "e8f9a1b2-c3d4-4e5b-6c7d-1a2b3c4d5e6f", nome: 'Escola Municipal Doutor Carlos Santana', detalhes: '109 alunos matriculados' },
+             { id: "f9a1b2c3-d4e5-4f6c-7d8e-1a2b3c4d5e6f", nome: 'Escola Municipal Eraldo Tinoco de Melo', detalhes: '161 alunos matriculados' },
+             { id: "a1b2c3d4-e5f6-4a7b-8c9d-f9a1b2c3d4e5", nome: 'Escola Municipal Érico Veríssimo', detalhes: '74 alunos matriculados' },
+             { id: "b2c3d4e5-f6a7-4b8c-9d1a-a1b2c3d4e5f6", nome: 'Escola Municipal General Osório', detalhes: '91 alunos matriculados' },
+             { id: "c3d4e5f6-a7b8-4c9d-1a2b-b2c3d4e5f6a7", nome: 'Escola Municipal Gonçalo Muniz', detalhes: '99 alunos matriculados' },
+             { id: "d4e5f6a7-b8c9-4d1a-2b3c-c3d4e5f6a7b8", nome: 'Escola Municipal Hermes de Carvalho', detalhes: '215 alunos matriculados' },
+             { id: "e5f6a7b8-c9d1-4e2b-3c4d-d4e5f6a7b8c9", nome: 'Escola Municipal Irene Andrade de Assis', detalhes: '417 alunos matriculados' },
+             { id: "f6a7b8c9-d1e2-4f3c-4d5e-e5f6a7b8c9d1", nome: 'Escola Municipal Isaías Figueiredo', detalhes: '227 alunos matriculados' },
+             { id: "a7b8c9d1-e2f3-4a4d-5e6f-f6a7b8c9d1e2", nome: 'Escola Municipal Jardim Petrolar', detalhes: '450 alunos matriculados' },
+             { id: "b8c9d1e2-f3a4-4b5e-6f7a-a7b8c9d1e2f3", nome: 'Escola Municipal Joana D’Arc', detalhes: '127 alunos matriculados' },
+             { id: "c9d1e2f3-a4b5-4c6f-7a8b-b8c9d1e2f3a4", nome: 'Escola Municipal José Abelha Flores', detalhes: '135 alunos matriculados' },
+             { id: "d1e2f3a4-b5c6-4d7a-8b9c-c9d1e2f3a4b5", nome: 'Escola Municipal José Antônio da Silva Lima', detalhes: '202 alunos matriculados' },
+             { id: "e2f3a4b5-c6d7-4e8b-9c1d-d1e2f3a4b5c6", nome: 'Escola Municipal José de Anchieta', detalhes: '215 alunos matriculados' },
+             { id: "f3a4b5c6-d7e8-4f9c-1d2e-e2f3a4b5c6d7", nome: 'Escola Municipal José Honorato', detalhes: '272 alunos matriculados' },
+             { id: "a4b5c6d7-e8f9-4a1d-2e3f-f3a4b5c6d7e8", nome: 'Escola Municipal José Nicolau da Silva', detalhes: '120 alunos matriculados' },
+             { id: "b5c6d7e8-f9a1-4b2e-3f4a-a4b5c6d7e8f9", nome: 'Escola Municipal Liodório Borges dos Santos', detalhes: '166 alunos matriculados' },
+             { id: "c6d7e8f9-a1b2-4c3f-4a5b-b5c6d7e8f9a1", nome: 'Escola Municipal Maria de Lourdes Santos', detalhes: '109 alunos matriculados' },
+             { id: "d7e8f9a1-b2c3-4d4a-5b6c-c6d7e8f9a1b2", nome: 'Escola Municipal Maria Feijó', detalhes: '419 alunos matriculados' },
+             { id: "e8f9a1b2-c3d4-4e5b-6c7d-d7e8f9a1b2c3", nome: 'Escola Municipal Menino Jesus', detalhes: '122 alunos matriculados' },
+             { id: "f9a1b2c3-d4e5-4f6c-7d8e-e8f9a1b2c3d4", nome: 'Escola Municipal Miguel Calmon', detalhes: '302 alunos matriculados' },
+             { id: "a1b2c3d4-e5f6-4a7b-8c9d-f9a1b2c3d4e5", nome: 'Escola Municipal Miguel Fontes', detalhes: '160 alunos matriculados' },
+             { id: "b2c3d4e5-f6a7-4b8c-9d1a-a1b2c3d4e5f6", nome: 'Escola Municipal Ministro Marco Maciel', detalhes: '228 alunos matriculados' },
+             { id: "c3d4e5f6-a7b8-4c9d-1a2b-b2c3d4e5f6a7", nome: 'Escola Municipal Nossa Senhora das Graças', detalhes: '62 alunos matriculados' },
+             { id: "d4e5f6a7-b8c9-4d1a-2b3c-c3d4e5f6a7b8", nome: 'Escola Municipal Nossa Senhora dos Milagres', detalhes: '85 alunos matriculados' },
+             { id: "e5f6a7b8-c9d1-4e2b-3c4d-d4e5f6a7b8c9", nome: 'Escola Municipal Nova Brasília', detalhes: '213 alunos matriculados' },
+             { id: "f6a7b8c9-d1e2-4f3c-4d5e-e5f6a7b8c9d1", nome: 'Escola Municipal Padre Cícero', detalhes: '105 alunos matriculados' },
+             { id: "a7b8c9d1-e2f3-4a4d-5e6f-f6a7b8c9d1e2", nome: 'Escola Municipal Paulo Freire', detalhes: '185 alunos matriculados' },
+             { id: "b8c9d1e2-f3a4-4b5e-6f7a-a7b8c9d1e2f3", nome: 'Escola Municipal Pedro Furtado', detalhes: '313 alunos matriculados' },
+             { id: "c9d1e2f3-a4b5-4c6f-7a8b-b8c9d1e2f3a4", nome: 'Escola Municipal Péricles Nogueira Magalhães', detalhes: '82 alunos matriculados' },
+             { id: "d1e2f3a4-b5c6-4d7a-8b9c-c9d1e2f3a4b5", nome: 'Escola Municipal Professor Álvaro Palmeira', detalhes: '183 alunos matriculados' },
+             { id: "e2f3a4b5-c6d7-4e8b-9c1d-d1e2f3a4b5c6", nome: 'Escola Municipal Professor Mário Laert', detalhes: '201 alunos matriculados' },
+             { id: "f3a4b5c6-d7e8-4f9c-1d2e-e2f3a4b5c6d7", nome: 'Escola Municipal Professor Maurílio José do Espírito Santo', detalhes: '104 alunos matriculados' },
+             { id: "a4b5c6d7-e8f9-4a1d-2e3f-f3a4b5c6d7e8", nome: 'Escola Municipal Professor Roberto Santos', detalhes: '260 alunos matriculados' },
+             { id: "b5c6d7e8-f9a1-4b2e-3f4a-a4b5c6d7e8f9", nome: 'Escola Municipal Professora Adalgisa Santos', detalhes: '101 alunos matriculados' },
+             { id: "c6d7e8f9-a1b2-4c3f-4a5b-b5c6d7e8f9a1", nome: 'Escola Municipal Professora Helenita Santana da Costa', detalhes: '141 alunos matriculados' },
+             { id: "d7e8f9a1-b2c3-4d4a-5b6c-c6d7e8f9a1b2", nome: 'Escola Municipal Professora Julinda Capinam', detalhes: '88 alunos matriculados' },
+             { id: "e8f9a1b2-c3d4-4e5b-6c7d-d7e8f9a1b2c3", nome: 'Escola Municipal Professora Luzia Margarida Pinto', detalhes: '153 alunos matriculados' },
+             { id: "f9a1b2c3-d4e5-4f6c-7d8e-e8f9a1b2c3d4", nome: 'Escola Municipal Quilombola Mãe Ernestina', detalhes: '69 alunos matriculados' },
+             { id: "a1b2c3d4-e5f6-4a7b-8c9d-f9a1b2c3d4e5", nome: 'Escola Municipal Quilombola Professor João Anastácio', detalhes: '38 alunos matriculados' },
+             { id: "b2c3d4e5-f6a7-4b8c-9d1a-a1b2c3d4e5f6", nome: 'Escola Municipal Rui Barbosa', detalhes: '116 alunos matriculados' },
+             { id: "c3d4e5f6-a7b8-4c9d-1a2b-b2c3d4e5f6a7", nome: 'Escola Municipal Santa Luzia', detalhes: '118 alunos matriculados' },
+             { id: "d4e5f6a7-b8c9-4d1a-2b3c-c3d4e5f6a7b8", nome: 'Escola Municipal Santa Rita', detalhes: '32 alunos matriculados' },
+             { id: "e5f6a7b8-c9d1-4e2b-3c4d-d4e5f6a7b8c9", nome: 'Escola Municipal Santa Terezinha', detalhes: '219 alunos matriculados' },
+             { id: "f6a7b8c9-d1e2-4f3c-4d5e-e5f6a7b8c9d1", nome: 'Escola Municipal São Geraldo', detalhes: '173 alunos matriculados' },
+             { id: "a7b8c9d1-e2f3-4a4d-5e6f-f6a7b8c9d1e2", nome: 'Escola Municipal São Izidoro', detalhes: '116 alunos matriculados' },
+             { id: "b8c9d1e2-f3a4-4b5e-6f7a-a7b8c9d1e2f3", nome: 'Escola Municipal São José', detalhes: '128 alunos matriculados' },
+             { id: "c9d1e2f3-a4b5-4c6f-7a8b-b8c9d1e2f3a4", nome: 'Escola Municipal Senhor do Bonfim', detalhes: '176 alunos matriculados' },
+             { id: "d1e2f3a4-b5c6-4d7a-8b9c-c9d1e2f3a4b5", nome: 'Escola Municipal Tancredo de Almeida Neves', detalhes: '176 alunos matriculados' },
+             { id: "e2f3a4b5-c6d7-4e8b-9c1d-d1e2f3a4b5c6", nome: 'Escola Municipal Tiradentes', detalhes: '169 alunos matriculados' },
+             { id: "f3a4b5c6-d7e8-4f9c-1d2e-e2f3a4b5c6d7", nome: 'Escola Municipal Tomé de Souza', detalhes: '109 alunos matriculados' },
+             { id: "a4b5c6d7-e8f9-4a1d-2e3f-f3a4b5c6d7e8", nome: 'Escola Municipal Uirassu de Assis Batista', detalhes: '228 alunos matriculados' },
+             { id: "b5c6d7e8-f9a1-4b2e-3f4a-a4b5c6d7e8f9", nome: 'Escola Municipal Vale do Sol', detalhes: '208 alunos matriculados' },
+             { id: "c6d7e8f9-a1b2-4c3f-4a5b-b5c6d7e8f9a1", nome: 'Escola Municipal Visconde do Rio Branco', detalhes: '143 alunos matriculados' }
+         ];
 
         // --- GESTÃO DE ERROS ---
         function displayGlobalError(message) {
@@ -385,32 +480,68 @@
              gerenciaIds.forEach(id => {
                 const docRef = doc(db, `artifacts/${appId}/public/data/gerencias`, id);
                 onSnapshot(docRef, (docSnap) => {
-                    if (docSnap.exists()) {
+                    if (!docSnap.exists() && canEdit()) {
+                        // Documento não existe, criar com estrutura vazia (ou inicial se for o primeiro acesso)
+                        console.log(`Documento para ${id} não encontrado. Criando...`)
+                         const baseData = {
+                            id: id,
+                            nome: GERENCIAS_INFO[id].nome,
+                            escolas: escolasIniciais, // Preenche com a lista de escolas
+                            projetosAtivos: [],
+                            profissionaisLibra: (id === 'inclusao' || id === 'ameei') ? initialLibrasProfessionals : [], // Adiciona lista de LIBRAS
+                            formacoes: [],
+                            ...(id === 'inclusao' && { alunos: [], profissionaisApoio: [] })
+                        };
+                         setDoc(docRef, baseData).then(() => {
+                             console.log(`Documento para ${id} criado com sucesso.`);
+                             state.data[id] = baseData; // Atualiza o estado local imediatamente
+                             if (state.selectedGerencia === id) render(); // Renderiza se esta gerência estiver selecionada
+                         }).catch(e => console.error(`Erro ao criar documento para ${id}:`, e));
+                    } else if (docSnap.exists()) {
+                        // Documento existe, usar os dados
                         state.data[id] = docSnap.data();
+                         if (state.selectedGerencia === id) render(); // Renderiza se esta gerência estiver selecionada
                     }
-                    if (state.selectedGerencia === id) render();
                 }, handleSnapshotError);
             });
-            const multimidiaDocRef = doc(db, `artifacts/${appId}/public/data/gerencias`, 'multimidia');
+
+             const multimidiaDocRef = doc(db, `artifacts/${appId}/public/data/gerencias`, 'multimidia');
             onSnapshot(multimidiaDocRef, (docSnap) => {
-                if (docSnap.exists()) { 
-                    state.data.multimidia = docSnap.data();
+                if (!docSnap.exists() && canEdit()) {
+                     console.log(`Documento para multimidia não encontrado. Criando...`)
+                    const baseData = { id: 'multimidia', midias: [] };
+                    setDoc(multimidiaDocRef, baseData).then(() => {
+                         console.log(`Documento para multimidia criado com sucesso.`);
+                        state.data.multimidia = baseData;
+                        if (state.selectedGerencia === 'multimidia') render();
+                    }).catch(e => console.error("Erro ao criar doc multimidia:", e));
+                } else if (docSnap.exists()) {
+                     state.data.multimidia = docSnap.data();
+                     if (state.selectedGerencia === 'multimidia') render();
                 }
-                if (state.selectedGerencia === 'multimidia') render();
             }, handleSnapshotError);
-            
-            const docRef = doc(db, `artifacts/${appId}/public/data/gerencias`, 'documentos');
-            onSnapshot(docRef, (docSnap) => {
-                if (docSnap.exists()) { 
-                    state.data.documentos = docSnap.data(); 
-                }
-                if (state.selectedGerencia === 'documentos') render();
+
+            const docRefDocs = doc(db, `artifacts/${appId}/public/data/gerencias`, 'documentos');
+            onSnapshot(docRefDocs, (docSnap) => {
+                 if (!docSnap.exists() && canEdit()) {
+                    console.log(`Documento para documentos não encontrado. Criando...`)
+                    const baseData = { id: 'documentos', documentos: [] };
+                    setDoc(docRefDocs, baseData).then(() => {
+                         console.log(`Documento para documentos criado com sucesso.`);
+                        state.data.documentos = baseData;
+                         if (state.selectedGerencia === 'documentos') render();
+                    }).catch(e => console.error("Erro ao criar doc documentos:", e));
+                 } else if (docSnap.exists()) {
+                    state.data.documentos = docSnap.data();
+                    if (state.selectedGerencia === 'documentos') render();
+                 }
             }, handleSnapshotError);
             
             renderSidebar();
             if(!state.selectedGerencia) setState({selectedGerencia: 'inclusao'});
             else render();
         }
+
 
         function render() {
             if (!state.selectedGerencia || !state.currentUser) {
@@ -428,19 +559,9 @@
         function renderSidebar() {
              const nav = document.getElementById('nav-gerencias');
             let navItems = '';
-            const allGerencias = {...GERENCIAS_INFO};
-            const sortedKeys = Object.keys(allGerencias).sort((a, b) => {
-                if (a === 'inclusao') return -1; if (b === 'inclusao') return 1;
-                if (a === 'multimidia') return 1; if (b === 'multimidia') return -1;
-                if (a === 'documentos') return 1; if (b === 'documentos') return -1;
-                return a.localeCompare(b);
-            });
-
-            // Filtra 'multimidia' e 'documentos' da navegação principal
-            const navKeys = sortedKeys.filter(id => id !== 'multimidia' && id !== 'documentos');
-
-            navKeys.forEach(id => {
-                const gerencia = allGerencias[id];
+            // Usa gerenciaIds que já contém a ordem correta
+            gerenciaIds.forEach(id => {
+                const gerencia = GERENCIAS_INFO[id];
                 navItems += `
                     <a href="#" data-gerencia="${id}" class="gerencia-link flex items-center space-x-3 text-gray-300 hover:bg-gray-700 hover:text-white rounded-md px-3 py-2 transition-colors duration-200">
                         <i class="fas ${gerencia.icon} w-6 text-center"></i>
@@ -464,43 +585,60 @@
 
         function renderHeader() {
              const title = document.getElementById('header-title');
-            if (state.selectedGerencia) {
+            if (state.selectedGerencia && GERENCIAS_INFO[state.selectedGerencia]) { // Verifica se a gerencia existe
                 title.innerHTML = `<i class="fas ${GERENCIAS_INFO[state.selectedGerencia].icon} text-blue-500"></i> ${GERENCIAS_INFO[state.selectedGerencia].nome}`;
             } else {
                  title.textContent = 'Bem-vindo!';
+                 // Se a gerência selecionada não for válida, volta para a de inclusão
+                 if (state.selectedGerencia && !GERENCIAS_INFO[state.selectedGerencia]) {
+                     console.warn(`Gerência selecionada inválida: ${state.selectedGerencia}. Redirecionando para Inclusão.`);
+                     setState({ selectedGerencia: 'inclusao', selectedAba: null });
+                 }
             }
         }
         
         function renderContent() {
             const contentArea = document.getElementById('content-area');
-            const data = state.data[state.selectedGerencia] || {};
+             // Verifica se a gerência selecionada é válida antes de tentar obter os dados
+            const data = GERENCIAS_INFO[state.selectedGerencia] ? state.data[state.selectedGerencia] || {} : {};
             
             const abasComuns = [ { id: 'escolas', nome: 'Unidades Escolares' }, { id: 'projetos', nome: 'Projetos Ativos' }, { id: 'libra', nome: 'Profissionais de LIBRAS' }, { id: 'formacao', nome: 'Formações' }, ];
+            // Define abas específicas para 'inclusao'
             const abasInclusao = [ { id: 'alunos', nome: 'Alunos' }, { id: 'pa', nome: 'Profissionais de Apoio (PA)' }, ...abasComuns ];
-            
-            let abas = (state.selectedGerencia === 'inclusao') ? abasInclusao : abasComuns;
-            if (state.selectedGerencia === 'multimidia' || state.selectedGerencia === 'documentos') abas = [];
 
-            if (!state.selectedAba || !abas.find(a => a.id === state.selectedAba)) {
-                if (state.selectedGerencia === 'multimidia') { state.selectedAba = 'midias' } 
+            let abas;
+             // Define quais abas usar baseado na gerência SELECIONADA
+            if (state.selectedGerencia === 'inclusao') {
+                abas = abasInclusao;
+            } else if (GERENCIAS_INFO[state.selectedGerencia] && state.selectedGerencia !== 'multimidia' && state.selectedGerencia !== 'documentos') {
+                 abas = abasComuns; // Usa abas comuns para outras diretorias válidas
+            } else {
+                abas = []; // Nenhuma aba para multimídia, documentos ou inválidas
+            }
+
+
+            // Define a aba padrão apenas se ainda não estiver definida ou se for inválida PARA AS ABAS ATUAIS
+             if (!state.selectedAba || !abas.find(a => a.id === state.selectedAba)) {
+                 if (state.selectedGerencia === 'multimidia') { state.selectedAba = 'midias' } 
                 else if (state.selectedGerencia === 'documentos') { state.selectedAba = 'docs' } 
-                else if (abas.length > 0) { state.selectedAba = abas[0].id; }
+                else if (abas.length > 0) { state.selectedAba = abas[0].id; } // Usa a primeira aba válida como padrão
                 else { state.selectedAba = null; }
             }
             
             let abasHtml = abas.map(aba => ` <button data-aba="${aba.id}" class="aba-link px-4 py-2 text-sm font-medium rounded-t-lg transition-colors duration-200 ${state.selectedAba === aba.id ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}"> ${aba.nome} </button>`).join('');
 
             let contentHtml = '';
+            // Renderiza conteúdo baseado na ABA selecionada
             switch(state.selectedAba) {
-                case 'alunos': contentHtml = renderAlunos(data); break;
-                case 'pa': contentHtml = renderProfissionaisApoio(data); break;
+                case 'alunos': contentHtml = (state.selectedGerencia === 'inclusao') ? renderAlunos(data) : 'Aba não disponível para esta diretoria.'; break; // Só renderiza se for inclusao
+                case 'pa': contentHtml = (state.selectedGerencia === 'inclusao') ? renderProfissionaisApoio(data) : 'Aba não disponível para esta diretoria.'; break; // Só renderiza se for inclusao
                 case 'escolas': contentHtml = renderEscolas(data); break;
                 case 'projetos': contentHtml = renderProjetos(data); break;
                 case 'libra': contentHtml = renderLibra(data); break;
                 case 'formacao': contentHtml = renderFormacao(data); break;
                 case 'midias': contentHtml = renderMultimidia(state.data.multimidia || { midias: [] }); break;
                 case 'docs': contentHtml = renderDocumentos(state.data.documentos || { documentos: [] }); break;
-                default: contentHtml = `<div class="text-center p-10"><h2 class="text-2xl font-semibold text-gray-600">Selecione uma aba para visualizar o conteúdo.</h2></div>`;
+                default: contentHtml = `<div class="text-center p-10"><h2 class="text-2xl font-semibold text-gray-600">Selecione uma diretoria ou aba para visualizar o conteúdo.</h2></div>`;
             }
 
             const finalHtml = `
@@ -940,7 +1078,8 @@
                 }
                 case 'form-edit-libra': {
                     const itemId = form.dataset.itemId;
-                    const updatedItems = (state.data[state.selectedGerencia].profissionaisLibra || []).map(item => (item.id === itemId) ? { ...item, nome: form.libraNome.value, cargo: form.libraCargo.value, unidadeEscolar: form.libraUnidade.value, alunosAtendidos: form.libraAlunos.value } : item);
+                    const currentGerenciaData = state.data[state.selectedGerencia] || { profissionaisLibra: [] };
+                    const updatedItems = (currentGerenciaData.profissionaisLibra || []).map(item => (item.id === itemId) ? { ...item, nome: form.libraNome.value, cargo: form.libraCargo.value, unidadeEscolar: form.libraUnidade.value, alunosAtendidos: form.libraAlunos.value } : item);
                     await updateDoc(docRef, { profissionaisLibra: updatedItems });
                     break;
                 }
@@ -951,14 +1090,15 @@
 
                     const midiaTipo = form.midiaTipo.value;
                     const titulo = form.midiaTitulo.value;
-                    let newItem = { id: crypto.randomUUID(), titulo, gerencia: state.selectedGerencia };
+                    let newItem = { id: crypto.randomUUID(), titulo, gerencia: state.selectedGerencia }; // Usar a gerência selecionada AQUI
 
                     try {
                         if (midiaTipo === 'Carregar Imagem') {
                             const file = form.midiaFile.files[0];
                             if (!file) {
                                 alert('Por favor, selecione um ficheiro de imagem.');
-                                return;
+                                submitBtn.disabled = false; submitBtn.textContent = 'Adicionar Mídia'; // Reabilita botão
+                                return; // Não fecha modal
                             }
                             const storageRef = ref(storage, `images/${Date.now()}_${file.name}`);
                             await uploadBytes(storageRef, file);
@@ -966,6 +1106,11 @@
                             newItem.url = downloadURL;
                             newItem.type = 'image';
                         } else {
+                            if (!form.midiaUrl.value) {
+                                alert('Por favor, insira a URL do vídeo.');
+                                submitBtn.disabled = false; submitBtn.textContent = 'Adicionar Mídia'; // Reabilita botão
+                                return; // Não fecha modal
+                            }
                             newItem.url = form.midiaUrl.value;
                             newItem.type = 'video';
                         }
@@ -975,9 +1120,11 @@
                         console.error("Erro ao adicionar mídia:", error);
                         alert(`Erro ao adicionar mídia: ${error.message}`);
                     } finally {
-                        submitBtn.disabled = false;
-                        submitBtn.textContent = 'Adicionar Mídia';
-                        closeModal();
+                        if (!e.defaultPrevented) { // Fecha modal apenas se não houve erro que impediu
+                           closeModal();
+                        } else {
+                           submitBtn.disabled = false; submitBtn.textContent = 'Adicionar Mídia';
+                        }
                     }
                     return; // Retorna para não fechar o modal antes do upload
                 }
@@ -999,12 +1146,15 @@
                     break;
                 }
             }
-            closeModal();
+            closeModal(); // Fecha modal após sucesso (exceto upload de mídia)
         });
 
         document.addEventListener('change', (e) => {
+            const form = e.target.closest('form');
+            if(!form) return;
+
             if (e.target.id === 'alunoSituacao') {
-                const deficienciaContainer = e.target.closest('form').querySelector('#deficiencia-container');
+                const deficienciaContainer = form.querySelector('#deficiencia-container');
                 if (e.target.value === 'Laudado') {
                     deficienciaContainer.classList.remove('hidden');
                 } else {
@@ -1012,8 +1162,8 @@
                 }
             }
             if(e.target.id === 'midiaTipo') {
-                const urlContainer = e.target.closest('form').querySelector('#midia-url-container');
-                const fileContainer = e.target.closest('form').querySelector('#midia-file-container');
+                const urlContainer = form.querySelector('#midia-url-container');
+                const fileContainer = form.querySelector('#midia-file-container');
                 if (e.target.value === 'Link de Vídeo (YouTube, etc)') {
                     urlContainer.classList.remove('hidden');
                     fileContainer.classList.add('hidden');
